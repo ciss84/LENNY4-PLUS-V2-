@@ -371,6 +371,11 @@ window.stage2_ = function() {
 
     var launch_chain = function(chain)
     {
+      var longjmp       = offsetToWebKit(0x1458);
+      var createThread  = offsetToWebKit(0x116ED40);
+ 
+      p.syscall(324, 1);
+
       var stackPointer = 0;
       var stackCookie = 0;
       var orig_reenter_rip = 0;
@@ -889,6 +894,8 @@ window.stage2_ = function() {
   var backing = new Uint8Array(0x10000 + size);
 
   window.nogc.push(backing);
+  
+      
   
       var thread2 = new window.rop();
 
