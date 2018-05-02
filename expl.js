@@ -1,3 +1,5 @@
+/////////////////// UTILITY STUFF ///////////////////
+
 function makeid() {
   var text = "";
   var possible = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
@@ -26,11 +28,6 @@ function u2d(low, hi) {
     _dview.setUint32(0, hi);
     _dview.setUint32(4, low);
     return _dview.getFloat64(0);
-}
-var dgc = function() {
-    for (var i = 0; i < 0x100; i++) {
-        new ArrayBuffer(0x100000);
-    }
 }
 
 function int64(low, hi) {
